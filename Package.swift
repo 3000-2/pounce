@@ -13,8 +13,7 @@ let package = Package(
                 .linkedFramework("AppKit"),
                 .linkedFramework("Carbon"),
                 .linkedFramework("ApplicationServices"),
-                .linkedFramework("ScreenCaptureKit"),
-                .linkedFramework("Vision"),
+                .linkedFramework("ServiceManagement"),
             ]
         ),
         .testTarget(

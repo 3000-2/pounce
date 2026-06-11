@@ -1,75 +1,98 @@
 import AppKit
+import Carbon
 
 @MainActor
 final class StatusItemController {
     private let item: NSStatusItem
-    private let titleItem: NSMenuItem
-    private let ocrItem: NSMenuItem
-    private let hotkeyMenu = NSMenu()
-    private let onSelectHotkey: (HotkeyPreference) -> Void
-    private let onToggleOCR: (Bool) -> Void
+    private let hintItem: NSMenuItem
+    private let scrollItem: NSMenuItem
+    private let launchItem: NSMenuItem
+    private let onOpenSettings: () -> Void
+    private let onToggleLaunchAtLogin: () -> Void
     private let onQuit: () -> Void
 
     init(
-        currentHotkey: HotkeyPreference,
-        onSelectHotkey: @escaping (HotkeyPreference) -> Void,
-        onToggleOCR: @escaping (Bool) -> Void,
+        onOpenSettings: @escaping () -> Void,
+        onToggleLaunchAtLogin: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
-        self.onSelectHotkey = onSelectHotkey
-        self.onToggleOCR = onToggleOCR
+        self.onOpenSettings = onOpenSettings
+        self.onToggleLaunchAtLogin = onToggleLaunchAtLogin
         self.onQuit = onQuit
 
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "cursorarrow.rays",
                                      accessibilityDescription: "Pounce")
 
-        titleItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        ocrItem = NSMenuItem(title: "OCR 폴백 (화면 기록 필요)",
-                             action: #selector(toggleOCR), keyEquivalent: "")
-        ocrItem.state = .off
+        hintItem = NSMenuItem(title: "힌트 모드", action: nil, keyEquivalent: "")
+        scrollItem = NSMenuItem(title: "스크롤 모드", action: nil, keyEquivalent: "")
+        launchItem = NSMenuItem(title: "로그인 시 열기",
+                                action: #selector(launchToggled), keyEquivalent: "")
 
         let menu = NSMenu()
-        menu.addItem(titleItem)
+        menu.addItem(hintItem)
+        menu.addItem(scrollItem)
         menu.addItem(.separator())
 
-        let hotkeyRoot = NSMenuItem(title: "활성화 단축키", action: nil, keyEquivalent: "")
-        for preset in HotkeyPreference.presets {
-            let entry = NSMenuItem(title: preset.name, action: #selector(selectHotkey(_:)), keyEquivalent: "")
-            entry.target = self
-            hotkeyMenu.addItem(entry)
-        }
-        hotkeyRoot.submenu = hotkeyMenu
-        menu.addItem(hotkeyRoot)
+        let settings = NSMenuItem(title: "설정…", action: #selector(settingsTapped), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
 
-        ocrItem.target = self
-        menu.addItem(ocrItem)
+        launchItem.target = self
+        menu.addItem(launchItem)
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "종료", action: #selector(quitTapped), keyEquivalent: "q")
+
+        let quit = NSMenuItem(title: "Pounce 종료", action: #selector(quitTapped), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
         item.menu = menu
-
-        reflect(hotkey: currentHotkey)
     }
 
-    func reflect(hotkey: HotkeyPreference) {
-        titleItem.title = "Pounce — \(hotkey.name) 힌트 · ⌘⇧S 스크롤"
-        for entry in hotkeyMenu.items {
-            entry.state = entry.title == hotkey.name ? .on : .off
+    func reflect(hint: Hotkey, scroll: Hotkey) {
+        apply(hint, to: hintItem, base: "힌트 모드")
+        apply(scroll, to: scrollItem, base: "스크롤 모드")
+    }
+
+    func reflectLaunchAtLogin(_ enabled: Bool) {
+        launchItem.state = enabled ? .on : .off
+    }
+
+    /// Informational rows: the combo renders as a native right-aligned key
+    /// equivalent when representable, otherwise falls back into the title.
+    private func apply(_ hotkey: Hotkey, to menuItem: NSMenuItem, base: String) {
+        if let character = Self.keyEquivalentCharacter(for: hotkey.keyCode) {
+            menuItem.title = base
+            menuItem.keyEquivalent = character
+            menuItem.keyEquivalentModifierMask = Self.cocoaFlags(fromCarbon: hotkey.modifiers)
+        } else {
+            menuItem.title = "\(base): \(hotkey.display)"
+            menuItem.keyEquivalent = ""
         }
     }
 
-    @objc private func selectHotkey(_ sender: NSMenuItem) {
-        guard let preset = HotkeyPreference.presets.first(where: { $0.name == sender.title }) else { return }
-        reflect(hotkey: preset)
-        onSelectHotkey(preset)
+    private static func keyEquivalentCharacter(for keyCode: UInt32) -> String? {
+        if Int(keyCode) == kVK_Space { return " " }
+        guard let name = HotkeyRecorderButton.keyNames[Int(keyCode)], name.count == 1 else {
+            return nil
+        }
+        return name.lowercased()
     }
 
-    @objc private func toggleOCR() {
-        let enabled = ocrItem.state != .on
-        ocrItem.state = enabled ? .on : .off
-        onToggleOCR(enabled)
+    private static func cocoaFlags(fromCarbon modifiers: UInt32) -> NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
+        if modifiers & UInt32(controlKey) != 0 { flags.insert(.control) }
+        if modifiers & UInt32(optionKey) != 0 { flags.insert(.option) }
+        if modifiers & UInt32(shiftKey) != 0 { flags.insert(.shift) }
+        if modifiers & UInt32(cmdKey) != 0 { flags.insert(.command) }
+        return flags
+    }
+
+    @objc private func settingsTapped() {
+        onOpenSettings()
+    }
+
+    @objc private func launchToggled() {
+        onToggleLaunchAtLogin()
     }
 
     @objc private func quitTapped() {

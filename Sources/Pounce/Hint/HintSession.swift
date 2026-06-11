@@ -13,16 +13,7 @@ final class HintSession {
     private var mouseMonitor: Any?
     private var appChangeObserver: (any NSObjectProtocol)?
 
-    private var ocrEnabled = false
     private let messagingTimeout: Float = 0.2
-    private let ocrFallbackThreshold = 3
-
-    func setOCREnabled(_ enabled: Bool) {
-        ocrEnabled = enabled
-        if enabled, !ScreenRecordingPermission.isGranted {
-            ScreenRecordingPermission.request()
-        }
-    }
 
     func start() {
         guard !active else { return }
@@ -52,44 +43,18 @@ final class HintSession {
             NSLog("Pounce: scanned %d targets in %.0fms", elements.count,
                   Date().timeIntervalSince(start) * 1000)
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { self.afterAXScan(elements, pid: pid) }
+                MainActor.assumeIsolated { self.present(elements) }
             }
         }
     }
 
-    private func afterAXScan(_ elements: [ClickableElement], pid: pid_t) {
-        guard active else { return }
-
-        // Dedup before the OCR-threshold check so duplicates can't mask an
-        // effectively empty screen, and before labeling so short hints aren't
-        // wasted on clones.
-        let axTargets = TargetDeduplicator.deduplicate(
+    private func present(_ elements: [ClickableElement]) {
+        guard active else { end(); return }
+        // Dedup before labeling so short hints aren't wasted on clones.
+        let targets = TargetDeduplicator.deduplicate(
             elements.map { HintTarget(id: $0.id, frame: $0.frame, kind: .accessibility($0.element)) },
             pressEquivalent: Self.pressEquivalent
         )
-
-        guard ocrEnabled, axTargets.count < ocrFallbackThreshold else {
-            if axTargets.isEmpty { end() } else { present(axTargets) }
-            return
-        }
-
-        NSLog("Pounce: AX returned \(axTargets.count) target(s) — falling back to OCR")
-        Task { @MainActor in
-            let ocrTargets = await VisionScanner.scanFrontWindow(pid: pid, startID: axTargets.count)
-            guard self.active else { return }
-            let combined = axTargets + ocrTargets
-            if combined.isEmpty {
-                self.end()
-            } else {
-                self.present(combined)
-            }
-        }
-    }
-
-    private func present(_ rawTargets: [HintTarget]) {
-        guard active else { end(); return }
-        // OCR targets may duplicate surviving AX ones; dedup is idempotent.
-        let targets = TargetDeduplicator.deduplicate(rawTargets, pressEquivalent: Self.pressEquivalent)
         guard !targets.isEmpty else { end(); return }
 
         let labels = HintLabeler.generate(count: targets.count)

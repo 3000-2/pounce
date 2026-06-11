@@ -20,12 +20,11 @@ make bundle    # .app 생성 + 서명
   - Chromium wake 속성은 `ManualAccessibility.setIfNeeded` 경유로만 쓴다 (직접 `AXUIElementSetAttributeValue` 금지).
   - `BadgeLayout` 계약: 활성화당 1회 레이아웃, 타이핑은 필터만 — 생존 배지를 움직이는 변경 금지.
   - `GlobalHotkey`는 고유 `id` + 미스매치 시 `eventNotHandledErr` 반환.
-- OCR/비전 폴백은 기본 off (메뉴바 옵트인). 이 게이팅과 화면 기록 권한 요청 시점을 우회하는 변경 금지.
 - Makefile 서명을 ad-hoc(`-`)으로 바꾸지 말 것 — 재빌드마다 손쉬운 사용 권한이 풀린다.
 - 커밋은 사용자가 요청할 때만.
 
 ## Gotchas
 
-- 권한 2종: AX 트리 = 손쉬운 사용, 픽셀 캡처 = 화면 기록. "켜져 있는데 안 먹으면" `tccutil reset Accessibility com.poc.pounce` 후 재부여.
+- 손쉬운 사용 권한이 "켜져 있는데 안 먹으면" TCC 유령 항목 — `tccutil reset Accessibility com.poc.pounce` 후 재부여.
 - Chrome AX가 스턱되면(윈도우 조회가 전부 메뉴 트리로 풀림) 외부 복구 불가 — Chrome 재시작.
 - Mac App Store 배포 불가 (샌드박스가 크로스앱 AX 차단). Developer ID 직배포 전제.

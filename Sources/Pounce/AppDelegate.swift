@@ -1,5 +1,4 @@
 import AppKit
-import Carbon
 import PounceCore
 
 @MainActor
@@ -7,49 +6,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let session = HintSession()
     private let scrollSession = ScrollSession()
     private let warmer = AccessibilityWarmer()
-    private var hotkey: GlobalHotkey?
-    private var scrollHotkey: GlobalHotkey?
+    private var hotkeys: [HotkeyRole: GlobalHotkey] = [:]
     private var statusItem: StatusItemController?
+    private var settings: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AccessibilityPermission.requestIfNeeded()
         warmer.start()
 
-        let preference = HotkeyPreference.load()
         statusItem = StatusItemController(
-            currentHotkey: preference,
-            onSelectHotkey: { [weak self] preset in
-                preset.save()
-                self?.register(preset)
+            onOpenSettings: { [weak self] in self?.openSettings() },
+            onToggleLaunchAtLogin: { [weak self] in
+                LaunchAtLogin.toggle()
+                self?.statusItem?.reflectLaunchAtLogin(LaunchAtLogin.isEnabled)
             },
-            onToggleOCR: { [weak self] enabled in self?.session.setOCREnabled(enabled) },
             onQuit: { NSApp.terminate(nil) }
         )
-        register(preference)
+        statusItem?.reflectLaunchAtLogin(LaunchAtLogin.isEnabled)
 
-        scrollHotkey = GlobalHotkey(
-            keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(cmdKey | shiftKey), id: 2
-        ) { [weak self] in
-            MainActor.assumeIsolated {
-                self?.session.cancel()
-                self?.scrollSession.start()
-            }
+        for role in HotkeyRole.allCases {
+            register(HotkeyStore.load(role), for: role)
         }
-        if scrollHotkey == nil {
-            NSLog("Pounce: failed to register scroll hot key ⌘⇧S")
-        }
+        reflectHotkeys()
     }
 
-    private func register(_ preference: HotkeyPreference) {
-        hotkey = nil
-        hotkey = GlobalHotkey(keyCode: preference.keyCode, modifiers: preference.modifiers, id: 1) { [weak self] in
-            MainActor.assumeIsolated {
-                self?.scrollSession.cancel()
-                self?.session.start()
+    private func openSettings() {
+        if settings == nil {
+            settings = SettingsWindowController { [weak self] role, hotkey in
+                guard let self else { return false }
+                guard self.register(hotkey, for: role) else { return false }
+                HotkeyStore.save(hotkey, for: role)
+                self.reflectHotkeys()
+                return true
+            }
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification,
+                object: settings?.window,
+                queue: .main
+            ) { [weak self] _ in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { self?.resumeHotkeys() }
+                }
             }
         }
-        if hotkey == nil {
-            NSLog("Pounce: failed to register hot key \(preference.name)")
+        // Registered combos are consumed system-wide before they can reach the
+        // recorder — pressing the current hotkey would trigger a session instead
+        // of recording. Pause all hotkeys while the settings window is open.
+        hotkeys.removeAll()
+        settings?.present()
+    }
+
+    private func resumeHotkeys() {
+        for role in HotkeyRole.allCases {
+            register(HotkeyStore.load(role), for: role)
         }
+        reflectHotkeys()
+    }
+
+    @discardableResult
+    private func register(_ hotkey: Hotkey, for role: HotkeyRole) -> Bool {
+        // Carbon ids start at 1; derive stably from the role.
+        let id = UInt32(HotkeyRole.allCases.firstIndex(of: role)! + 1)
+        hotkeys[role] = nil
+        hotkeys[role] = GlobalHotkey(keyCode: hotkey.keyCode, modifiers: hotkey.modifiers, id: id) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                switch role {
+                case .hint:
+                    self.scrollSession.cancel()
+                    self.session.start()
+                case .scroll:
+                    self.session.cancel()
+                    self.scrollSession.start()
+                }
+            }
+        }
+        if hotkeys[role] == nil {
+            NSLog("Pounce: failed to register %@ hot key %@", role.rawValue, hotkey.display)
+            return false
+        }
+        return true
+    }
+
+    private func reflectHotkeys() {
+        statusItem?.reflect(hint: HotkeyStore.load(.hint), scroll: HotkeyStore.load(.scroll))
     }
 }

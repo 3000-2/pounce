@@ -17,16 +17,4 @@ public enum CoordinateConversion {
     public static func axCenter(of ax: CGRect) -> CGPoint {
         CGPoint(x: ax.midX, y: ax.midY)
     }
-
-    /// Vision `boundingBox` is normalised with a bottom-left origin, relative to
-    /// the captured display; output is an AX/Quartz global rect (top-left).
-    public static func screenRect(fromVisionBoundingBox box: CGRect, displayBounds: CGRect) -> CGRect {
-        let topLeftY = 1 - box.origin.y - box.size.height
-        return CGRect(
-            x: displayBounds.minX + box.origin.x * displayBounds.width,
-            y: displayBounds.minY + topLeftY * displayBounds.height,
-            width: box.size.width * displayBounds.width,
-            height: box.size.height * displayBounds.height
-        )
-    }
 }
