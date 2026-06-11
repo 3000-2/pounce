@@ -33,10 +33,11 @@
 ## 설치
 
 ```sh
-brew install --cask --no-quarantine 3000-2/tap/pounce
+brew install --cask 3000-2/tap/pounce
+xattr -d com.apple.quarantine /Applications/Pounce.app
 ```
 
-`--no-quarantine`은 아직 공증되지 않은 앱의 Gatekeeper 차단을 피하기 위한 플래그다. 빼고 설치했다면 첫 실행 시 시스템 설정 → 개인정보 보호 및 보안에서 "그래도 열기"를 한 번 눌러야 한다.
+아직 공증(notarize)되지 않은 앱이라 두 번째 줄로 Gatekeeper 격리를 풀어야 한다. 대신 첫 실행이 차단된 뒤 시스템 설정 → 개인정보 보호 및 보안에서 "그래도 열기"를 눌러도 된다.
 
 소스 빌드: `git clone https://github.com/3000-2/pounce.git && cd pounce && make run`
 
