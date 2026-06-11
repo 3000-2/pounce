@@ -25,6 +25,6 @@ make bundle    # .app 생성 + 서명
 
 ## Gotchas
 
-- 손쉬운 사용 권한이 "켜져 있는데 안 먹으면" TCC 유령 항목 — `tccutil reset Accessibility com.poc.pounce` 후 재부여.
+- 손쉬운 사용 권한이 "켜져 있는데 안 먹으면" TCC 유령 항목 — `tccutil reset Accessibility io.github.3000-2.pounce` 후 재부여.
 - Chrome AX가 스턱되면(윈도우 조회가 전부 메뉴 트리로 풀림) 외부 복구 불가 — Chrome 재시작.
 - Mac App Store 배포 불가 (샌드박스가 크로스앱 AX 차단). Developer ID 직배포 전제.

@@ -46,7 +46,7 @@ brew install --cask --no-quarantine 3000-2/tap/pounce
 
 ## 문제 해결
 
-- **힌트가 안 뜸**: 손쉬운 사용 권한 확인. 켜져 있는데도 안 되면 `tccutil reset Accessibility com.poc.pounce` 후 다시 부여.
+- **힌트가 안 뜸**: 손쉬운 사용 권한 확인. 켜져 있는데도 안 되면 `tccutil reset Accessibility io.github.3000-2.pounce` 후 다시 부여.
 - **Chrome에서 첫 트리거가 빈손**: 페이지 접근성 트리가 만들어지는 데 1~2초 걸릴 수 있다. 한 번 더 트리거하면 된다.
 
 ## 개발

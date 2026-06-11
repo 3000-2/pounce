@@ -7,7 +7,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>Pounce</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.poc.pounce</string>
+	<string>io.github.3000-2.pounce</string>
 	<key>CFBundleExecutable</key>
 	<string>Pounce</string>
 	<key>CFBundlePackageType</key>
